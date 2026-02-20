@@ -1,0 +1,96 @@
+---
+
+- name: Collecter les facts
+  ansible.builtin.setup:
+    gather_subset:
+      - min
+      - date_time
+
+- name: Installer les prérequis
+  ansible.builtin.apt:
+    name: [curl, ca-certificates, gnupg]
+    state: present
+    update_cache: true
+
+- name: Installer Docker
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+
+- name: Vérifier que Docker fonctionne
+  ansible.builtin.command: docker info
+  changed_when: false
+
+
+- name: Installer k3d
+  ansible.builtin.shell: |
+    curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+  args:
+    creates: /usr/local/bin/k3d
+
+- name: Installer kubectl
+  ansible.builtin.shell: |
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    rm -f kubectl
+  args:
+    creates: /usr/local/bin/kubectl
+
+
+- name: Vérifier si le cluster k3d existe
+  ansible.builtin.command: k3d cluster list -o json
+  register: k3d_cluster_list
+  changed_when: false
+
+- name: Obtenir l'IP gateway du host
+  ansible.builtin.shell: ip route | grep default | awk '{print $3}'
+  register: gateway_ip
+  changed_when: false
+
+- name: Créer le cluster k3d
+  ansible.builtin.command: >
+    k3d cluster create {{ k3d_cluster_name }}
+    --servers {{ k3d_servers }}
+    --agents {{ k3d_agents }}
+    -p "{{ k3d_nodeport }}:{{ k3d_nodeport }}@server:0"
+    --k3s-arg "--tls-san={{ gateway_ip.stdout | trim }}@server:0"
+  when: k3d_cluster_name not in k3d_cluster_list.stdout
+  notify: Attendre que le cluster soit prêt
+
+- name: Forcer l'exécution des handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Configurer kubeconfig
+  ansible.builtin.shell: |
+    k3d kubeconfig merge {{ k3d_cluster_name }} --kubeconfig-merge-default --kubeconfig-switch-context
+    sed -i "s/0\.0\.0\.0/{{ gateway_ip.stdout | trim }}/g" /root/.kube/config
+  changed_when: true
+
+- name: Vérifier la connexion au cluster
+  ansible.builtin.command: kubectl get nodes
+  changed_when: false
+
+
+- name: Générer la page HTML
+  ansible.builtin.set_fact:
+    nginx_html_content: "{{ lookup('template', 'index.html.j2') }}"
+
+- name: Générer le manifest Kubernetes
+  ansible.builtin.template:
+    src: nginx-manifest.yml.j2
+    dest: /tmp/nginx-manifest.yml
+    mode: '0644'
+
+- name: Appliquer le manifest Kubernetes
+  ansible.builtin.command: kubectl apply -f /tmp/nginx-manifest.yml
+  register: kubectl_apply
+  changed_when: "'created' in kubectl_apply.stdout or 'configured' in kubectl_apply.stdout"
+
+- name: Attendre que NGINX soit prêt
+  ansible.builtin.command: >
+    kubectl rollout status deployment/nginx-deployment --timeout=120s
+  changed_when: false
+
+- name: Afficher l'URL d'accès
+  ansible.builtin.debug:
+    msg: "NGINX accessible sur : http://localhost:{{ k3d_nodeport }}"

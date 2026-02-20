@@ -1,0 +1,9 @@
+---
+# Variables par défaut du rôle k3d-lab
+k3d_cluster_name: "k3d-lab"
+k3d_servers: 1
+k3d_agents: 1
+k3d_nodeport: 30080
+
+nginx_replicas: 1
+welcome_message: "Bienvenue dans le k3d LAB"

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ welcome_message }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ welcome_message }}</h1>
+        <p class="info">
+            Cluster : <span class="badge">{{ k3d_cluster_name }}</span><br>
+            Déployé le : <span class="badge">{{ ansible_date_time.date }}</span>
+            à <span class="badge">{{ ansible_date_time.time }}</span><br>
+            Hôte : <span class="badge">{{ ansible_hostname }}</span>
+        </p>
+    </div>
+</body>
+</html>

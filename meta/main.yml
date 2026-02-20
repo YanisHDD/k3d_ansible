@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: YanisHDD
+  description: Déploiement automatisé d'un cluster k3d avec NGINX
+  license: MIT
+  min_ansible_version: "2.10"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+
+  galaxy_tags:
+    - kubernetes
+    - k3d
+    - nginx
+    - docker
+    - devops
+
+dependencies: []

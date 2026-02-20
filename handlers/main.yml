@@ -1,0 +1,10 @@
+---
+# Handlers du rôle k3d-lab
+
+- name: Attendre que le cluster soit prêt
+  ansible.builtin.command: kubectl get nodes
+  register: nodes_check
+  until: "'Ready' in nodes_check.stdout"
+  retries: 5
+  delay: 5
+  changed_when: false
